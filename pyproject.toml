@@ -1,0 +1,16 @@
+[project]
+name = "voltage-profile"
+version = "1.0.0"
+description = "Analyse du profil de tension d'un réseau de distribution"
+requires-python = ">=3.10"
+dependencies = [
+  "flet==0.28.3",
+  "pandas",
+  "matplotlib",
+  "reportlab",
+]
+
+[tool.flet]
+product = "Profil de tension"
+org = "dz.univ-setif"
+permissions = ["storage"]
