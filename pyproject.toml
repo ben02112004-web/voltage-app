@@ -12,5 +12,5 @@ dependencies = [
 
 [tool.flet]
 product = "Profil de tension"
-org = "dz.univ-setif"
+org = "dz.univsetif"
 permissions = ["storage"]
