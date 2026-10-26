@@ -12,23 +12,45 @@ ACCENT = "#1B6CA8"
 # ---------------------------------------------------------------- logique
 def load_voltages(path):
     """Lit un CSV et retourne (liste_bus, liste_tensions)."""
-    df = pd.read_csv(path, sep=None, engine="python")
+    with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
+        head = f.read(2048)
+    sep = ";" if head.count(";") > head.count(",") else ("\t" if "\t" in head else ",")
+    df = pd.read_csv(path, sep=sep, encoding="utf-8-sig", dtype=str)
+
+    # fichier sans en-tête (la 1ère ligne est déjà numérique)
+    def is_num(s):
+        try:
+            float(str(s).strip().replace(",", "."))
+            return True
+        except ValueError:
+            return False
+
+    if all(is_num(c) for c in df.columns):
+        df = pd.read_csv(path, sep=sep, encoding="utf-8-sig", header=None, dtype=str)
+        df.columns = [f"col{i}" for i in range(len(df.columns))]
+
     df.columns = [str(c).strip().lower() for c in df.columns]
-    col = None
-    for c in df.columns:
-        if any(k in c for k in ("tension", "voltage", "v_pu", "vpu", "u")) and \
-                pd.api.types.is_numeric_dtype(df[c]):
-            col = c
-            break
-    if col is None:
-        nums = df.select_dtypes("number").columns.tolist()
-        if not nums:
-            raise ValueError("Aucune colonne numérique trouvée")
-        col = nums[-1]
-    volts = df[col].dropna().astype(float).tolist()
-    bus_col = next((c for c in df.columns if "bus" in c or "noeud" in c), None)
-    if bus_col is not None and len(df[bus_col].dropna()) == len(volts):
-        buses = df[bus_col].dropna().astype(int).tolist()
+    # conversion numérique (virgule décimale acceptée)
+    num = df.apply(lambda s: pd.to_numeric(
+        s.astype(str).str.strip().str.replace(",", ".", regex=False), errors="coerce"))
+    num = num.dropna(axis=1, how="all")
+    if num.empty:
+        raise ValueError("Aucune colonne numérique trouvée")
+
+    bus_words = ("bus", "noeud", "nœud", "node", "n°", "num", "id", "index")
+    bus_col = next((c for c in num.columns if any(w in c for w in bus_words)), None)
+
+    volt_words = ("tension", "voltage", "volt", "pu", "p.u", "vm", "u")
+    candidates = [c for c in num.columns if c != bus_col]
+    col = next((c for c in candidates if any(w in c for w in volt_words[:-1])), None)
+    if col is None and candidates:
+        col = candidates[-1]
+    if col is None:          # un seul colonne numérique
+        col = bus_col
+
+    volts = num[col].dropna().astype(float).tolist()
+    if bus_col is not None and bus_col != col:
+        buses = num.loc[num[col].notna(), bus_col].fillna(0).astype(int).tolist()
     else:
         buses = list(range(1, len(volts) + 1))
     return buses, volts
@@ -268,3 +290,6 @@ def main(page: ft.Page):
 
 
 ft.app(target=main)
+
+
+
